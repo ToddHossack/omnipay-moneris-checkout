@@ -45,7 +45,7 @@ class PurchaseResponse extends AbstractResponse implements RedirectResponseInter
      */
     public function getRedirectResponse()
     {
-        if (!$this instanceof RedirectResponseInterface || !$this->isRedirect()) {
+        if (!$this->isRedirect()) {
             throw new RuntimeException('This response does not support redirection.');
         }
 

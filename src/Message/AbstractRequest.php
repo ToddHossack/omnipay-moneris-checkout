@@ -34,7 +34,11 @@ abstract class AbstractRequest extends \Omnipay\Common\Message\AbstractRequest
             throw new RuntimeException('Request cannot be modified after it has been sent!');
         }
 
-        $parameterCfg = $this->requiredParameterConfig();
+        $parameterCfg = array_merge(
+            static::requiredParameterConfig(),
+            static::optionalParameterConfig(),
+            static::optionalParameterObjectConfig()
+        );
         
         $this->parameters = new ParameterBag;
 
@@ -46,11 +50,7 @@ abstract class AbstractRequest extends \Omnipay\Common\Message\AbstractRequest
                     $this->$method($value);
                 }
                 // Set if configured
-                elseif(array_key_exists($key,array_merge(
-                    $this->requiredParameterConfig(),
-                    $this->optionalParameterConfig(),
-                    $this->optionalParameterObjectConfig()
-                ))) {
+                elseif(array_key_exists($key,$parameterCfg)) {
                     $this->parameters->set($key,$value);
                 }
             }
@@ -87,14 +87,14 @@ abstract class AbstractRequest extends \Omnipay\Common\Message\AbstractRequest
      * Returns configuration for required parameters.
      * @return array
      */
-    abstract public function requiredParameterConfig();
+    abstract static public function requiredParameterConfig();
   
     /**
      * Returns configuration for optional parameters.
      * Overridden in subclasses as needed.
      * @return array
      */
-    public function optionalParameterConfig()
+    public static function optionalParameterConfig()
     {
         return [];
     }
@@ -104,10 +104,44 @@ abstract class AbstractRequest extends \Omnipay\Common\Message\AbstractRequest
      * Overridden in subclasses as needed.
      * @return array
      */
-    public function optionalParameterObjectConfig()
+    public static function optionalParameterObjectConfig()
     {
         return [];
     }
+    
+    public static function condensedParameterConfig()
+    {
+        $condensed = [];
+        
+        $all = array_merge(
+            static::requiredParameterConfig(),
+            static::optionalParameterConfig(),
+            static::optionalParameterObjectConfig()
+        );
+        
+        return static::flattenConfig($all);
+    }
+    
+    protected static function flattenConfig($parameterCfg)
+    {
+        $condensed = [];
+        if(is_array($parameterCfg)) {
+            foreach($parameterCfg as $key => $cfg) {
+                $type = isset($cfg['type']) ? $cfg['type'] : 'string';
+                // Arrays / objects
+                if(!empty($cfg['variables']) && is_array($cfg['variables'])) {
+                    $condensed[$key] = static::flattenConfig($cfg['variables']);
+                }
+                // Scalar
+                else {
+                    $condensed[$key] = $cfg;
+                }
+            }
+        }
+        
+        return $condensed;
+    }
+    
     
     /* ------------------------------------------------------------------------ 
      * Parameter data methods
@@ -137,7 +171,7 @@ abstract class AbstractRequest extends \Omnipay\Common\Message\AbstractRequest
     {
         $data = [];
         
-        $config = $this->requiredParameterConfig();
+        $config = static::requiredParameterConfig();
         
         if(is_array($config)) {
             foreach($config as $key => $cfg) {
@@ -160,13 +194,24 @@ abstract class AbstractRequest extends \Omnipay\Common\Message\AbstractRequest
     {
         $data = [];
         
-        $config = array_merge($this->optionalParameterConfig(),$this->optionalParameterObjectConfig());
+        $config = array_merge(static::optionalParameterConfig(),static::optionalParameterObjectConfig());
         
-        if(!empty($config)) {
-            foreach($config as $key => $cfg) {
-                $val = $this->getParameterData($key,$cfg);
-                if(!is_null($val)) {
+        $optional = array_intersect_key($this->parameters->all(),$config);
+        
+        if(!empty($optional)) {
+            foreach($optional as $key => $val) {
+                $cfg = isset($config[$key]) ? $config[$key] : null;
+                
+                // Ignore keys without corresponding configuration
+                // or values without any data
+                if(empty($cfg) || (is_null($val) || $val === '')) {
+                    continue;
+                }
+                
+                try {
                     $data[$key] = Helper::formatParameterValue($key,$val,$cfg);
+                } catch (\Exception $ex) {
+                    throw new RuntimeException($ex->getMessage(),$ex->getCode());
                 }
             }
         }

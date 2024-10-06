@@ -12,7 +12,7 @@ class PreloadRequest extends AbstractRequest
      * ------------------------------------------------------------------------    
      */
     
-    public function requiredParameterConfig() 
+    public static function requiredParameterConfig() 
     {
         return [
             'txn_total' => [
@@ -31,7 +31,7 @@ class PreloadRequest extends AbstractRequest
      * Optional Parameter Config
      * ------------------------------------------------------------------------    
      */
-    public function optionalParameterConfig() 
+    public static function optionalParameterConfig() 
     {
         return [
             'order_no' => [
@@ -83,14 +83,14 @@ class PreloadRequest extends AbstractRequest
      * with allowed sub-keys specified.
      * @return array
      */
-    public function optionalParameterObjectConfig() 
+    public static function optionalParameterObjectConfig() 
     {
         return [
-            'recur' => $this->recurConfig(),
-            'cart' => $this->cartConfig(),
-            'contact_details' => $this->contactDetailsConfig(),
-            'shipping_details' => $this->shippingDetailsConfig(),
-            'billing_details' => $this->billingDetailsConfig()
+            'recur' => static::recurConfig(),
+            'cart' => static::cartConfig(),
+            'contact_details' => static::contactDetailsConfig(),
+            'shipping_details' => static::shippingDetailsConfig(),
+            'billing_details' => static::billingDetailsConfig()
         ];
     }
     
@@ -99,7 +99,7 @@ class PreloadRequest extends AbstractRequest
      * Available variables contained under the "variables" key
      * @return array
      */
-    protected function recurConfig()
+    public static function recurConfig()
     {
         return [
             'type' => 'object', // Associative array
@@ -147,7 +147,7 @@ class PreloadRequest extends AbstractRequest
      * Available variables contained under the "variables" key
      * @return array
      */
-    protected function cartConfig()
+    public static function cartConfig()
     {
         return [
             'type' => 'object', // Associative array
@@ -189,7 +189,7 @@ class PreloadRequest extends AbstractRequest
                     'decimals' => 2,
                     'limit' => 10,
                 ], 
-                'tax' => $this->taxConfig()
+                'tax' => static::taxConfig()
             ]
             
         ];
@@ -201,7 +201,7 @@ class PreloadRequest extends AbstractRequest
      * Available variables contained under the "variables" key
      * @return array
      */
-    protected function taxConfig()
+    public static function taxConfig()
     {
         return [
             'type' => 'object', // Associative array
@@ -231,24 +231,27 @@ class PreloadRequest extends AbstractRequest
      * Contact details configuration.
      * @return array
      */
-    protected function contactDetailsConfig()
+    public static function contactDetailsConfig()
     {
         return [
-            'first_name' => [
-                'type' => 'string',
-                'limit' => 30
-            ],
-            'last_name' => [
-                'type' => 'string',
-                'limit' => 30
-            ],
-            'email' => [
-                'type' => 'string',
-                'limit' => 255
-            ],
-            'phone' => [
-                'type' => 'string',
-                'limit' => 30
+            'type' => 'object', // Associative array
+            'variables' => [
+                'first_name' => [
+                    'type' => 'string',
+                    'limit' => 30
+                ],
+                'last_name' => [
+                    'type' => 'string',
+                    'limit' => 30
+                ],
+                'email' => [
+                    'type' => 'string',
+                    'limit' => 255
+                ],
+                'phone' => [
+                    'type' => 'string',
+                    'limit' => 30
+                ]
             ]
         ];
     }
@@ -257,36 +260,39 @@ class PreloadRequest extends AbstractRequest
      * Shipping details configuration.
      * @return array
      */
-    protected function shippingDetailsConfig()
+    public static function shippingDetailsConfig()
     {
         return [
-            'address_1' => [
-                'type' => 'string',
-                'limit' => 50,
-                'replace' => ['<','>','$'.'%','=','\\','?','^','{','}','[',']','"']
-            ],
-            'address_2' => [
-                'type' => 'string',
-                'limit' => 50,
-                'replace' => ['<','>','$'.'%','=','\\','?','^','{','}','[',']','"']
-            ],
-            'city' => [
-                'type' => 'string',
-                'limit' => 50
-            ],
-            'province' => [
-                'type' => 'string',
-                'limit' => 2  // Country subdivision ISO 3166-2
-            ],
-            'country' => [
-                'type' => 'string',
-                'limit' => 2  // Country ISO 3166-1 alpha-2
-            ],
-            'postal_code' => [
-                'type' => 'string',
-                'limit' => 20,
-                'replace' => ['<','>','$'.'%','=','\\','?','^','{','}','[',']','"']
-            ],
+            'type' => 'object', // Associative array
+            'variables' => [
+                'address_1' => [
+                    'type' => 'string',
+                    'limit' => 50,
+                    'replace' => ['<','>','$'.'%','=','\\','?','^','{','}','[',']','"']
+                ],
+                'address_2' => [
+                    'type' => 'string',
+                    'limit' => 50,
+                    'replace' => ['<','>','$'.'%','=','\\','?','^','{','}','[',']','"']
+                ],
+                'city' => [
+                    'type' => 'string',
+                    'limit' => 50
+                ],
+                'province' => [
+                    'type' => 'string',
+                    'limit' => 2  // Country subdivision ISO 3166-2
+                ],
+                'country' => [
+                    'type' => 'string',
+                    'limit' => 2  // Country ISO 3166-1 alpha-2
+                ],
+                'postal_code' => [
+                    'type' => 'string',
+                    'limit' => 20,
+                    'replace' => ['<','>','$'.'%','=','\\','?','^','{','}','[',']','"']
+                ]
+            ]
         ];
     }
     
@@ -295,9 +301,9 @@ class PreloadRequest extends AbstractRequest
      * (Same as shipping details configuration).
      * @return array
      */
-    protected function billingDetailsConfig()
+    public static function billingDetailsConfig()
     {
-        return $this->shippingDetailsConfig();
+        return static::shippingDetailsConfig();
     }
     
     /* ------------------------------------------------------------------------ 
@@ -311,8 +317,12 @@ class PreloadRequest extends AbstractRequest
      * @return type
      */
     public function sendData($data)
-    {
-        return $this->response = new PreloadResponse($this, $data);
+    { 
+        echo '<pre>';
+        print_r($data); 
+        echo '</pre>'; exit;
+        $this->response = new PreloadResponse($this, $data);
+        return $this->response;
     }
     
     /*
@@ -424,24 +434,6 @@ class PreloadRequest extends AbstractRequest
         $data['ship_country'] = $card->getShippingCountry();
         $data['ship_phone'] = $card->getShippingPhone();
 
-    }
-    */
-    /**
-     * Add custom response variables
-     * @param array $data
-     
-    protected function addRvarData(&$data)
-    {
-        $rvar = $this->getRvar();
-
-        if(!is_array($rvar)) {
-            return;
-        }
-        
-        foreach($rvar as $key => $value) {
-            $data['rvar'.$key] = $value;
-        }
-    
     }
     */
         

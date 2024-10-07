@@ -2,7 +2,7 @@
 namespace Omnipay\Moneris;
 
 use Omnipay\Common\AbstractGateway;
-use Omnipay\Common\Helper;
+use Omnipay\Moneris\Helper;
 use Omnipay\Common\Exception\RuntimeException;
 use Symfony\Component\HttpFoundation\ParameterBag;
 
@@ -18,6 +18,11 @@ class Gateway extends AbstractGateway
     {
         $this->parameters = new ParameterBag;
 
+        $config = array_merge(
+            static::requiredParameterConfig(),
+            static::optionalParameterConfig()
+        );
+        
         if(is_array($parameters)) {
             foreach($parameters as $key => $value) {
                 // Use setter if available
@@ -25,13 +30,9 @@ class Gateway extends AbstractGateway
                 if(method_exists($this, $method)) {
                     $this->$method($value);
                 }
-                // Set if configured
-                // @todo check parameters
-                elseif(array_key_exists($key,array_merge(
-                    $this->requiredParameterConfig(),
-                    $this->optionalParameterConfig()
-                ))) {
-                    $this->parameters->set($key,$value);
+                // Set if configured, formatting and checking as per config
+                elseif(array_key_exists($key,$config)) {
+                    $this->parameters->set($key,Helper::formatParameterValue($key,$value,$config[$key]));
                 }
             }
         };
@@ -58,7 +59,7 @@ class Gateway extends AbstractGateway
      * Returns configuration for required gateway parameters.
      * @return array
      */
-    public function requiredParameterConfig() 
+    public static function requiredParameterConfig() 
     {
         return [
             'store_id' => [
@@ -86,43 +87,10 @@ class Gateway extends AbstractGateway
      * Returns configuration for optional gateway parameters.
      * @return array
      */
-    public function optionalParameterConfig() 
+    public static function optionalParameterConfig() 
     {
         return [];
     }
-    
-    /*
-    public function getDefaultParameters()
-    {
-        return array(
-            'storeId' => '',
-            'apiToken' => '',
-            'checkoutId' => '',
-            'environment' => ''
-        );
-    }
-
-    
-    public function getStoreId()
-    {
-        return $this->getParameter('storeId');
-    }
-
-    public function setStoreId($value)
-    {
-        return $this->setParameter('storeId', $value);
-    }
-
-    public function getApiToken()
-    {
-        return $this->getParameter('apiToken');
-    }
-
-    public function setApiToken($value)
-    {
-        return $this->setParameter('apiToken', $value);
-    }
-    */
     
     /* ------------------------------------------------------------------------ 
      * Flow methods
@@ -137,7 +105,9 @@ class Gateway extends AbstractGateway
      */
     public function purchase(array $parameters = array())
     {
-        return $this->createRequest('\Omnipay\Moneris\Message\PreloadRequest', $parameters);
+        $request = $this->createRequest('\Omnipay\Moneris\Message\PreloadRequest', $parameters);
+        $request->setGatewayParameters($this->parameters->all());
+        return $request;
     }
 
     /**
@@ -148,7 +118,9 @@ class Gateway extends AbstractGateway
      */
     public function completePurchase(array $parameters = array())
     {
-        return $this->createRequest('\Omnipay\Moneris\Message\ReceiptRequest', $parameters);
+        $request = $this->createRequest('\Omnipay\Moneris\Message\ReceiptRequest', $parameters);
+        $request->setGatewayParameters($this->parameters->all());
+        return $request;
     }
 
 }

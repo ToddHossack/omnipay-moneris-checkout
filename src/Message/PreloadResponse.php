@@ -11,7 +11,7 @@ use RuntimeException;
 /**
  * Moneris Purchase Response
  */
-class PurchaseResponse extends AbstractResponse implements RedirectResponseInterface
+class PreloadResponse extends AbstractResponse implements RedirectResponseInterface
 {
     public function isSuccessful()
     {
@@ -46,7 +46,7 @@ class PurchaseResponse extends AbstractResponse implements RedirectResponseInter
     public function getRedirectResponse()
     {
         if (!$this->isRedirect()) {
-            throw new RuntimeException('This response does not support redirection.');
+            throw new RuntimeException('This response requires redirection.');
         }
 
         if ('GET' === $this->getRedirectMethod()) {

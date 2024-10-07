@@ -13,6 +13,10 @@ abstract class AbstractRequest extends \Omnipay\Common\Message\AbstractRequest
     protected $liveEndpoint = 'https://gateway.moneris.com/chktv2/request/request.php';
     protected $testEndpoint = 'https://gatewayt.moneris.com/chktv2/request/request.php';
     
+    protected $gatewayParameters = [];
+    
+    protected $responseClass;
+    
     /* ------------------------------------------------------------------------ 
      * Init
      * ------------------------------------------------------------------------    
@@ -64,9 +68,32 @@ abstract class AbstractRequest extends \Omnipay\Common\Message\AbstractRequest
      * ------------------------------------------------------------------------    
      */
     
+    /**
+     * Gets gateway parameters
+     * @param array $parameters
+     * @return array
+     */
+    public function getGatewayParameters($parameters)
+    {
+        return $this->gatewayParameters;
+    }
+    
+    /**
+     * Sets gateway parameters
+     * @param array $parameters
+     */
+    public function setGatewayParameters($parameters)
+    {
+        $this->gatewayParameters = $parameters;
+    }
+    
+    /**
+     * Gets endpoint
+     * @return string
+     */
     public function getEndpoint()
     {
-        return $this->getTestMode() ? $this->testEndpoint : $this->liveEndpoint;
+        return $this->isTest() ? $this->testEndpoint : $this->liveEndpoint;
     }
     
     /**
@@ -76,6 +103,24 @@ abstract class AbstractRequest extends \Omnipay\Common\Message\AbstractRequest
     public function setTestEndpoint($url)
     {
         $this->testEndpoint = $url;
+    }
+    
+    /**
+     * Gets the class to use for the request response
+     * @return string
+     */
+    public function getResponseClass()
+    {
+        return $this->responseClass;
+    }
+    
+    /**
+     * Sets the class to use for the request response
+     * @return string
+     */
+    public function setResponseClass($class)
+    {
+        $this->responseClass = $class;
     }
     
     /* ------------------------------------------------------------------------ 
@@ -152,14 +197,21 @@ abstract class AbstractRequest extends \Omnipay\Common\Message\AbstractRequest
     {
         $data = [];
         
-        // Required
+        // Gateway parameter data
+        $data += (array) $this->getGatewayData();
+        
+        // Required parameter dasta
         $data += (array) $this->getRequiredData();
         
-        // Optional
+        // Optional parameter data
         $data += (array) $this->getOptionalData();
         
-        
         return $data;
+    }
+    
+    public function getGatewayData() 
+    {
+        return $this->gatewayParameters;
     }
     
     /**
@@ -240,77 +292,57 @@ abstract class AbstractRequest extends \Omnipay\Common\Message\AbstractRequest
         }
     }
     
-    /*
-    public function getStoreId()
+    public function isTest()
     {
-        return $this->getParameter('store_id');
-    }
-
-    public function setStoreId($value)
-    {
-        return $this->setParameter('store_id', $value);
-    }
-
-    public function getApiToken()
-    {
-        return $this->getParameter('api_token');
-    }
-
-    public function setApiToken($value)
-    {
-        return $this->setParameter('api_token', $value);
-    }
-
-    public function getCheckoutId()
-    {
-        return $this->getParameter('checkout_id');
-    }
-
-    public function setCheckoutId($value)
-    {
-        return $this->setParameter('checkout_id', $value);
-    }
-
-    public function getCustId()
-    {
-        return $this->getParameter('custId');
-    }
-
-    public function setCustId($value)
-    {
-        return $this->setParameter('custId', $value);
+        $mode = $this->getParameter('environment');
+        return ($mode && $mode === 'prod') ? false : true;
     }
     
-    public function getNote()
-    {
-        return $this->getParameter('note');
-    }
-
-    public function setNote($value)
-    {
-        return $this->setParameter('note', $value);
-    }
+    /* ------------------------------------------------------------------------ 
+     * Flow methods
+     * ------------------------------------------------------------------------    
+     */
     
-    public function getLang()
-    {
-        return $this->getParameter('lang');
-    }
+    /**
+     * 
+     * @param array $data
+     * @return object
+     */
+    public function sendData($data)
+    { 
+        echo '<pre>';
+        print_r($data); 
+        echo '</pre>'; 
+        $body = json_encode($data,JSON_HEX_APOS | JSON_HEX_QUOT);
+   
+        //try {
+            $request = $this->httpClient->createRequest(
+                'POST',
+                $this->getEndpoint(),
+                ['Accept' => 'application/json'],
+                $body,
+                [
+                    'allow_redirects' => false,
+                    'timeout' => 5
+                ]
+            );
 
-    public function setLang($value)
-    {
-        return $this->setParameter('lang', $value);
-    }
-    
-    public function getRvar()
-    {
-        return $this->getParameter('rvar');
-    }
+            $response = $this->httpClient->send($request);
+            var_dump($response);
+            exit;
+            echo $response->getBody();
+            exit;
+            /*
+            $class = $this->getResponseClass();
+            $this->response = new $class($this, $data);
+             * 
+             */
+            
+        //} catch (\Exception $ex) {
+            throw new RuntimeException($ex->getMessage(),$ex->getCode());
+        //}
 
-    public function setRvar($arr)
-    {
-        return $this->setParameter('rvar', $arr);
+        return $this->response;
     }
-    */
-    
     
 }

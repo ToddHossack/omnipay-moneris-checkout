@@ -18,10 +18,7 @@ class Gateway extends AbstractGateway
     {
         $this->parameters = new ParameterBag;
 
-        $config = array_merge(
-            static::requiredParameterConfig(),
-            static::optionalParameterConfig()
-        );
+        $config = static::parameterConfig();
         
         if(is_array($parameters)) {
             foreach($parameters as $key => $value) {
@@ -30,9 +27,9 @@ class Gateway extends AbstractGateway
                 if(method_exists($this, $method)) {
                     $this->$method($value);
                 }
-                // Set if configured, formatting and checking as per config
+                // Set if key is configured, formatting and checking as config
                 elseif(array_key_exists($key,$config)) {
-                    $this->parameters->set($key,Helper::formatParameterValue($key,$value,$config[$key]));
+                    $this->parameters->set($key,Helper::formatAndValidateParameterValue($key,$value,$config[$key]));
                 }
             }
         };
@@ -59,37 +56,32 @@ class Gateway extends AbstractGateway
      * Returns configuration for required gateway parameters.
      * @return array
      */
-    public static function requiredParameterConfig() 
+    public static function parameterConfig() 
     {
         return [
             'store_id' => [
                 'type' => 'string',
                 'limit' => 10,
+                'required' => true
             ],
             'api_token' => [
                 'type' => 'string',
                 'limit' => 20,
+                'required' => true
             ],
             'checkout_id' => [
                 'type' => 'string',
                 'limit' => 30,
+                'required' => true
             ],
             'environment' => [
                 'type' => 'string',
                 'options' => [
                     'qa', 'prod'
-                ]
+                ],
+                'required' => true
             ]
         ];
-    }
-    
-    /**
-     * Returns configuration for optional gateway parameters.
-     * @return array
-     */
-    public static function optionalParameterConfig() 
-    {
-        return [];
     }
     
     /* ------------------------------------------------------------------------ 
@@ -106,7 +98,7 @@ class Gateway extends AbstractGateway
     public function purchase(array $parameters = array())
     {
         $request = $this->createRequest('\Omnipay\Moneris\Message\PreloadRequest', $parameters);
-        $request->setGatewayParameters($this->parameters->all());
+        $request->setGatewayParameters($this->prepareParameterDataArray());
         return $request;
     }
 
@@ -119,8 +111,65 @@ class Gateway extends AbstractGateway
     public function completePurchase(array $parameters = array())
     {
         $request = $this->createRequest('\Omnipay\Moneris\Message\ReceiptRequest', $parameters);
-        $request->setGatewayParameters($this->parameters->all());
+        $request->setGatewayParameters($this->prepareParameterDataArray());
         return $request;
     }
 
+    /**
+     * Prepares, formats and validates parameter data according to configuration
+     * @return array
+     * @throws RuntimeException
+     */
+    public function prepareParameterDataArray()
+    {
+        $data = [];
+        
+        $config = static::parameterConfig();
+        
+        if(empty($config)) {
+            throw new RuntimeException('Configuration not found for required parameters.');
+        }
+        
+        foreach($config as $key => $cfg) {
+            $val = Helper::prepareParameterData($key,$this->getParameterData($key,$cfg),$cfg);
+           
+            // Ignore keys without corresponding configuration
+            // or values without any data
+            if(empty($cfg) || Helper::isEmpty($val)) {
+                continue;
+            }
+            
+            $data[$key] = $val;
+        }
+        
+        return $data;
+    }
+    
+    /**
+     * Gets data for given parameter key, trying getters first, 
+     * before using the standard parameter bag "get".
+     * @param string $key
+     * @param array $cfg
+     * @return mixed
+     */
+    protected function getParameterData($key,$cfg=null)
+    {
+        // Use getter if available
+        $method = 'get'.ucfirst(Helper::camelCase($key));
+        if(method_exists($this, $method)) {
+            return $this->$method($value);
+        }
+        
+        $type = isset($cfg['type']) ? $cfg['type'] : 'string';
+        $default = isset($cfg['default']) ? $cfg['default'] : null;
+
+        // Get data from parameter bag, using getter, if available
+        $method = 'get'.ucfirst($type);
+        if(method_exists($this->parameters, $method)) {
+            return $this->parameters->$method($key,$default);
+        } else {
+            return $this->parameters->get($key,$default);
+        }
+    }
+    
 }

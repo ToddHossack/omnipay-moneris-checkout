@@ -17,6 +17,8 @@ abstract class AbstractRequest extends \Omnipay\Common\Message\AbstractRequest
     
     protected $responseClass;
     
+    protected $jsonBody = true;
+    
     /* ------------------------------------------------------------------------ 
      * Init
      * ------------------------------------------------------------------------    
@@ -70,10 +72,9 @@ abstract class AbstractRequest extends \Omnipay\Common\Message\AbstractRequest
     
     /**
      * Gets gateway parameters
-     * @param array $parameters
      * @return array
      */
-    public function getGatewayParameters($parameters)
+    public function getGatewayParameters()
     {
         return $this->gatewayParameters;
     }
@@ -201,77 +202,52 @@ abstract class AbstractRequest extends \Omnipay\Common\Message\AbstractRequest
         $data += (array) $this->getGatewayData();
         
         // Required parameter dasta
-        $data += (array) $this->getRequiredData();
+        $data += (array) $this->prepareParameterDataArray(static::requiredParameterConfig(),true);
         
         // Optional parameter data
-        $data += (array) $this->getOptionalData();
+        $data += (array) $this->prepareParameterDataArray(array_merge(
+            (array) static::optionalParameterConfig(), 
+            (array) static::optionalParameterObjectConfig()
+        ));
         
         return $data;
     }
     
+    // Assumed formatted and validated by gateway
     public function getGatewayData() 
     {
         return $this->gatewayParameters;
     }
     
-    /**
-     * Gets the required parameter data
-     * @return array
-     * @throws RuntimeException
-     */
-    public function getRequiredData() 
+    public function prepareParameterDataArray($config,$required=false)
     {
         $data = [];
         
-        $config = static::requiredParameterConfig();
-        
-        if(is_array($config)) {
-            foreach($config as $key => $cfg) {
-                $val = $this->getParameterData($key,$cfg);
-                // Check required
-                if(is_null($val)) {
-                    throw new RuntimeException(sprintf('Required parameter %s is missing for request.',$key));
-                }
-                // Format and check value
-                $data[$key] = Helper::formatParameterValue($key,$val,$cfg);
-            }
-        } else {
+        if(empty($config) && $required) {
             throw new RuntimeException('Configuration not found for required parameters.');
         }
         
-        return $data;
-    }
-    
-    public function getOptionalData()
-    {
-        $data = [];
-        
-        $config = array_merge(static::optionalParameterConfig(),static::optionalParameterObjectConfig());
-        
-        $optional = array_intersect_key($this->parameters->all(),$config);
-        
-        if(!empty($optional)) {
-            foreach($optional as $key => $val) {
-                $cfg = isset($config[$key]) ? $config[$key] : null;
-                
-                // Ignore keys without corresponding configuration
-                // or values without any data
-                if(empty($cfg) || (is_null($val) || $val === '')) {
-                    continue;
-                }
-                
-                try {
-                    $data[$key] = Helper::formatParameterValue($key,$val,$cfg);
-                } catch (\Exception $ex) {
-                    throw new RuntimeException($ex->getMessage(),$ex->getCode());
-                }
+        foreach($config as $key => $cfg) {
+            $val = Helper::prepareParameterData($key,$this->getParameterData($key,$cfg),$cfg);
+            // Ignore keys without corresponding configuration
+            // or values without any data
+            if(empty($cfg) || Helper::isEmpty($val)) {
+                continue;
             }
+            
+            $data[$key] = $val;
         }
         
         return $data;
     }
     
-    
+    /**
+     * Gets data for given parameter key, trying getters first, 
+     * before using the standard parameter bag "get".
+     * @param string $key
+     * @param array $cfg
+     * @return mixed
+     */
     protected function getParameterData($key,$cfg=null)
     {
         // Use getter if available
@@ -291,7 +267,7 @@ abstract class AbstractRequest extends \Omnipay\Common\Message\AbstractRequest
             return $this->parameters->get($key,$default);
         }
     }
-    
+  
     public function isTest()
     {
         $mode = $this->getParameter('environment');
@@ -310,39 +286,90 @@ abstract class AbstractRequest extends \Omnipay\Common\Message\AbstractRequest
      */
     public function sendData($data)
     { 
-        echo '<pre>';
-        print_r($data); 
-        echo '</pre>'; 
-        $body = json_encode($data,JSON_HEX_APOS | JSON_HEX_QUOT);
-   
-        //try {
+        try {
+            
+            $body = ($this->jsonBody) 
+                ? json_encode($data,JSON_HEX_APOS | JSON_HEX_QUOT)
+                : $data;
+            
+            /*
+             * HTTP response
+             
+            $response = $this->sendHttpRequest($body);
+            
+            $responseData = ($this->jsonBody) 
+                ? json_decode($response->getBody(),true)
+                : $response->getBody();
+
+            Helper::debug($data);
+            Helper::debug($responseData);
+            */
+            // Test 
+            $responseData = [
+                'response' => [
+                    'success' => true,
+                    'ticket' => '17286024482FrxAP4Ym9vfb1mrhf4xxBtbgJ2xCT'
+                ]
+            ];
+            // Programmed response
+            $class = $this->getResponseClass();
+            $this->response = new $class($this, $responseData);
+        
+        } catch (\Exception $ex) {
+            Helper::debug($ex->getMessage()); exit;
+            throw new RuntimeException($ex->getMessage(),$ex->getCode());
+        }
+
+        return $this->response;
+    }
+    
+    /**
+     * 
+     * @param array $data
+     * @return \Guzzle\Http\Message\Response
+     * @throws RuntimeException
+     */
+    protected function sendHttpRequest($body)
+    {
+         /*
+         * Set up request
+         */
+        $requestOptions = [
+            'allow_redirects' => false,
+            'timeout' => 5
+        ];
+        
+        // Test requests may require following setting, to "supply the path
+        // to a CA bundle to enable verification using a custom certificate" such 
+        // as a self-signed certificate  
+        if($this->isTest()) {
+            $requestOptions['verify'] = \Composer\CaBundle\CaBundle::getSystemCaRootBundlePath();
+        }
+        
+        // JSON
+        if($this->jsonBody) {
+            $headers['Accept'] = 'application/json';
+        }
+        /*
+         * Request / response
+         */
+        try {
+            // HTTP request
             $request = $this->httpClient->createRequest(
                 'POST',
                 $this->getEndpoint(),
-                ['Accept' => 'application/json'],
+                $headers,
                 $body,
-                [
-                    'allow_redirects' => false,
-                    'timeout' => 5
-                ]
+                $requestOptions
             );
-
-            $response = $this->httpClient->send($request);
-            var_dump($response);
-            exit;
-            echo $response->getBody();
-            exit;
-            /*
-            $class = $this->getResponseClass();
-            $this->response = new $class($this, $data);
-             * 
-             */
             
-        //} catch (\Exception $ex) {
-            throw new RuntimeException($ex->getMessage(),$ex->getCode());
-        //}
+            // HTTP response
+            return $this->httpClient->send($request);
 
-        return $this->response;
+        } catch (\Exception $ex) {
+            Helper::debug($ex->getMessage()); exit;
+            throw new RuntimeException($ex->getMessage(),$ex->getCode());
+        }
     }
     
 }

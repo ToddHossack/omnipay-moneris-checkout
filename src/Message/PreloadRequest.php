@@ -23,11 +23,13 @@ class PreloadRequest extends AbstractRequest
             'txn_total' => [
                 'type' => 'float',
                 'decimals' => 2,
-                'limit' => 10
+                'limit' => 10,
+                'required' => true
             ],
             'action' => [
                 'type' => 'string',
-                'default' => 'preload'
+                'default' => 'preload',
+                'required' => true
             ]
         ];
     }

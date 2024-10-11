@@ -21,120 +21,44 @@ class Helper extends \Omnipay\Common\Helper
         static::$defaultPrecision = (int) $digits;
     }
     
-    /**
-     * Formats value of parameter, based on configuration provided.
-     * Recursive - to handle parameter objects.
-     * All scalar values cast to string after processing, unless
-     * configuration key "send_type" is set to another data type.
-     * @param string|int|float|array $val
-     * @param array $cfg
-     * @return string|int|float|array
+    /* ------------------------------------------------------------------------ 
+     * Parameter data handling
+     * ------------------------------------------------------------------------    
      */
-    public static function formatParameterValue($key,$val,$cfg=[])
-    {
-        // Configured cast types
-        $type = isset($cfg['type']) ? $cfg['type'] : 'string';
-        
-        // Numeric array (JS array)
-        if($type === 'array' && is_array($val)) {
-            // Config for sub variables
-            $variablesCfg = isset($cfg['variables']) ? $cfg['variables'] : [];
-            // Iterate items
-            foreach($val as &$v) {
-                if(is_array($v)) {
-                    // Iterate variables and format values
-                    static::formatParameterSubElements($v,$variablesCfg);
-                }
-            }
-        }
-        
-        // Associative array (JS object)
-        elseif($type === 'object' && is_array($val)) {
-            // Config for sub variables
-            $variablesCfg = isset($cfg['variables']) ? $cfg['variables'] : [];
-            // Iterate variables and format values
-            static::formatParameterSubElements($val,$variablesCfg);
-        }
-        
-        // Scalar
-        else {
-            $val = static::formatScalarValue($key,$val,$cfg);
-        }
-        
-        return $val;
-    }
     
-    /**
-     * 
-     * @param string $key
-     * @param string|int|float $val
-     * @param array $cfg
-     * @return string|int|float
-     * @throws RuntimeException
-     */
-    public static function formatScalarValue($key,$val,$cfg=[],$check=true)
+    public static function prepareParameterData($key,$val,$cfg) 
     {
+        // Configured data types
         $type = isset($cfg['type']) ? $cfg['type'] : 'string';
         $sendType = isset($cfg['send_type']) ? $cfg['send_type'] : 'string';
         
-        // Trim
-        if(is_string($val)) {
-            $val = trim($val);
-        }
-        // Initial cast
-        $val = static::castTo($val,$type);
-
-        // Check integer range
-        if($type === 'int') {
-            // Min
-            if($check && isset($cfg['min']) && $val < intval($cfg['min'])) {
-                throw new RuntimeException(sprintf('Parameter %s must be greater than %d.',$key,intval($cfg['min'])));
-            }
-            // Max
-            if($check && isset($cfg['max']) && $val > intval($cfg['max'])) {
-                throw new RuntimeException(sprintf('Parameter %s must be less than %d.',$key,intval($cfg['max'])));
+        // Config for sub variables
+        $variablesCfg = isset($cfg['variables']) ? $cfg['variables'] : [];
+        
+        // Numeric array (JS array)
+        if($type === 'array') {
+            if(is_array($val)) {
+                // Iterate items, which are associative arrays
+                foreach($val as &$v) {
+                    if(is_array($v)) {
+                        // Iterate variables and format values
+                        static::prepareParameterSubElements($v,$variablesCfg);
+                    }
+                }
             }
         }
 
-        // Not in allowed options
-        if($check && !empty($cfg['options']) && is_array($cfg['options']) && !in_array($val,$cfg['options'],true)) {
-            throw new RuntimeException(sprintf('Allowed values for parameter %s are %s.',$key,'['.implode('|',$cfg['options']).']'));
+        // Associative array (JS object)
+        elseif($type === 'object') {
+            if(is_array($val)) {
+                // Iterate variables and format values
+                static::prepareParameterSubElements($val,$variablesCfg);
+            }
         }
 
-        // Final cast
-        if($sendType !== $type) {
-            $val = static::castTo($val,$sendType,$cfg);
-        }
-
-        // Format / check string
-        if($sendType === 'string') {
-            // String length
-            if(isset($cfg['limit']) && strlen($val) > intval($cfg['limit'])) {
-                if($check) {
-                    throw new RuntimeException(sprintf('Parameter %s has a limit of %d characters.',$key,intval($cfg['limit'])));
-                }
-                // Truncate
-                else {
-                    $val = substr($val,0,intval($cfg['limit']));
-                }
-            }
-            // Disallowed characters
-            if(!empty($cfg['replace'])) {
-            
-            }
-            // Replace disallowed characters
-            if(!empty($cfg['replace'])) {
-                $count = null;
-                $replaced = str_replace($cfg['replace'],'',$val,$count);
-                // Check
-                if($count && $check) {
-                    throw new RuntimeException(sprintf('Parameter %s contains disallowed characters (%s).',$key,implode(',',(array)$cfg['replace'])));
-                }
-                // Use replaced
-                else {
-                    $val = $replaced;
-                }
-            }
+        // Scalar value
+        else {
+            $val = static::formatAndValidateParameterValue($key,$val,$cfg);
         }
         
         return $val;
@@ -145,12 +69,106 @@ class Helper extends \Omnipay\Common\Helper
      * @param array $elements
      * @param array $cfg
      */
-    protected static function formatParameterSubElements(&$elements,$cfg=[])
+    protected static function prepareParameterSubElements(&$elements,$cfg=[])
     {
         foreach((array) $elements as $key => &$v) {
             $varCfg = isset($cfg[$key]) ? $cfg[$key] : [];
-            $v = self::formatParameterValue($key,$v,$varCfg);
+            $v = static::prepareParameterData($key,$v,$varCfg);
+            // Unset empty parameters
+            if(static::isEmpty($v)) {
+                unset($elements[$key]);
+            }
         }
+    }
+    
+    /* ------------------------------------------------------------------------ 
+     * Formatting and validation
+     * ------------------------------------------------------------------------    
+     */
+    /**
+     * 
+     * @param string $key
+     * @param string|int|float $val
+     * @param array $cfg
+     * @return string|int|float
+     * @throws RuntimeException
+     */
+    public static function formatAndValidateParameterValue($key,$val,$cfg)
+    {
+        $type = isset($cfg['type']) ? $cfg['type'] : 'string';
+        $sendType = isset($cfg['send_type']) ? $cfg['send_type'] : 'string';
+        
+        // Trim
+        if(is_string($val)) {
+            $val = trim($val);
+        }
+        
+        // Check required
+        static::validateRequired($key,$val,$cfg);
+        
+        // Initial cast
+        $val = static::castTo($val,$type);
+
+        // Check integer range
+        if($type === 'int') {
+            // Min
+            if(isset($cfg['min']) && $val < intval($cfg['min'])) {
+                throw new RuntimeException(sprintf('Parameter %s must be greater than %d.',$key,intval($cfg['min'])));
+            }
+            // Max
+            if(isset($cfg['max']) && $val > intval($cfg['max'])) {
+                throw new RuntimeException(sprintf('Parameter %s must be less than %d.',$key,intval($cfg['max'])));
+            }
+        }
+
+        // Not in allowed options
+        if(!static::isEmpty($val) && !empty($cfg['options']) && is_array($cfg['options']) && !in_array($val,$cfg['options'],true)) {
+            throw new RuntimeException(sprintf('Allowed values for parameter %s are %s.',$key,'['.implode('|',$cfg['options']).']'));
+        }
+
+        // Final cast
+        if($sendType !== gettype($val)) {
+            $val = static::castTo($val,$sendType,$cfg);
+        }
+
+        // Format / check string
+        if($sendType === 'string') {
+            // String length
+            if(isset($cfg['limit']) && strlen($val) > intval($cfg['limit'])) {
+                throw new RuntimeException(sprintf('Parameter %s has a limit of %d characters.',$key,intval($cfg['limit'])));
+            }
+
+            // Replace disallowed characters
+            if(!empty($cfg['replace'])) {
+                $count = null;
+                $replaced = str_replace($cfg['replace'],'',$val,$count);
+                // Check
+                if($count) {
+                    throw new RuntimeException(sprintf('Parameter %s contains disallowed characters (%s).',$key,implode(',',(array)$cfg['replace'])));
+                }
+                else {
+                    $val = $replaced;
+                }
+            }
+        }
+        
+        return $val;
+    }
+    
+    
+    public static function validateRequired($key,$val,$cfg=[])
+    {
+        if(!empty($cfg['required']) && static::isEmpty($val)) {
+            throw new RuntimeException(sprintf('A value is required for parameter %s.',$key));
+        }
+    }
+    
+    public static function isEmpty($val)
+    {
+        return (
+            (is_null($val) || $val === '')
+            || (is_array($val) && !count($val))
+        );
     }
     
     /**
@@ -185,11 +203,52 @@ class Helper extends \Omnipay\Common\Helper
                     $decimals = isset($options['decimals']) ? (int) $options['decimals'] : static::defaultPrecision;
                     return number_format($val,$decimals);
                 }
-                if(is_array($val)) var_dump($val);
                 return (string) $val;
                 break;
         };
         
+    }
+    
+    /**
+     * Get an item from an array or object using "dot" notation.
+     *
+     * @param  object|array $data
+     * @param  string|int $key  (path with dot notation, or array path)
+     * @param  mixed $default
+     *
+     * @return mixed
+     */
+    public static function data_get($data, $key, $default = null) {
+        if (empty($data) || $key === '' || $key === null)
+            return value($default);
+        $object_get = function ($obj, $k) {
+            return isset($obj->{$k}) ? $obj->{$k} : null;
+        };
+        $array_get = function ($arr, $k) {
+            return (isset($arr[$k])) ? $arr[$k] : null;
+        };
+
+        $result = $data;
+        $keys = is_array($key) ? $key : explode('.', $key);
+        $numKeys = count($keys);
+        $i = 1;
+        foreach ($keys as $k) {
+            if (is_object($result)) {
+                $result = $object_get($result, $k);
+            } elseif (is_array($result)) {
+                $result = $array_get($result, $k);
+            } else {
+                $result = null;
+                if ($i < $numKeys)
+                    break;
+            }
+            ++$i;
+        }
+        return ($result !== null) ? $result : self::value($default);
+    }
+    
+    public static function value($value) {
+        return ($value instanceof Closure) ? $value() : $value;
     }
     
     public static function truncate($str,$limit)
@@ -197,5 +256,10 @@ class Helper extends \Omnipay\Common\Helper
         return substr(trim(strval($str)),0,intval($limit));
     }
     
-    
+    public static function debug($data)
+    {
+        echo '<pre>';
+        print_r($data);
+        echo '</pre>';
+    }
 }

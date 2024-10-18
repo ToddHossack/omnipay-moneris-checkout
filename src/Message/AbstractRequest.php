@@ -2,6 +2,7 @@
 namespace Omnipay\Moneris\Message;
 
 use Omnipay\Moneris\Helper;
+use Omnipay\Moneris\Config;
 use Omnipay\Common\Exception\RuntimeException;
 use Symfony\Component\HttpFoundation\ParameterBag;
 
@@ -10,8 +11,6 @@ use Symfony\Component\HttpFoundation\ParameterBag;
  */
 abstract class AbstractRequest extends \Omnipay\Common\Message\AbstractRequest
 {
-    protected $liveEndpoint = 'https://gateway.moneris.com/chktv2/request/request.php';
-    protected $testEndpoint = 'https://gatewayt.moneris.com/chktv2/request/request.php';
     
     protected $gatewayParameters = [];
     
@@ -94,16 +93,7 @@ abstract class AbstractRequest extends \Omnipay\Common\Message\AbstractRequest
      */
     public function getEndpoint()
     {
-        return $this->isTest() ? $this->testEndpoint : $this->liveEndpoint;
-    }
-    
-    /**
-     * Set test end point - allow for local development / mock gateways
-     * @param string $url
-     */
-    public function setTestEndpoint($url)
-    {
-        $this->testEndpoint = $url;
+        return $this->isTest() ? Config::getTestEndpoint() : Config::getLiveEndpoint();
     }
     
     /**
@@ -294,23 +284,25 @@ abstract class AbstractRequest extends \Omnipay\Common\Message\AbstractRequest
             
             /*
              * HTTP response
-             
+             */
             $response = $this->sendHttpRequest($body);
             
             $responseData = ($this->jsonBody) 
                 ? json_decode($response->getBody(),true)
                 : $response->getBody();
 
+            /*
+            // Test 
             Helper::debug($data);
             Helper::debug($responseData);
-            */
-            // Test 
+            
             $responseData = [
                 'response' => [
                     'success' => true,
                     'ticket' => '17286024482FrxAP4Ym9vfb1mrhf4xxBtbgJ2xCT'
                 ]
             ];
+             */
             // Programmed response
             $class = $this->getResponseClass();
             $this->response = new $class($this, $responseData);

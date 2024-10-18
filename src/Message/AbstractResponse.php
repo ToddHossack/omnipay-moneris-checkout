@@ -6,18 +6,6 @@ use Omnipay\Moneris\Helper;
 
 class AbstractResponse extends \Omnipay\Common\Message\AbstractResponse
 {
-
-    protected $liveJsUrl = 'https://gateway.moneris.com/chktv2/js/chkt_v2.00.js';
-    protected $testJsUrl = 'https://gatewayt.moneris.com/chktv2/js/chkt_v2.00.js';
-    
-    /**
-     * Gets JS Url
-     * @return string
-     */
-    public function getJsUrl()
-    {
-        return $this->isTest() ? $this->testJsUrl : $this->liveJsUrl;
-    }
     
     public function isTest()
     {

@@ -2,6 +2,7 @@
 namespace Omnipay\Moneris\Message;
 
 use Omnipay\Moneris\Helper;
+use Omnipay\Moneris\Config;
 
 use Omnipay\Moneris\Message\AbstractResponse;
 use Omnipay\Common\Message\RedirectResponseInterface;
@@ -21,5 +22,9 @@ class PreloadResponse extends AbstractResponse
         return true;
     }
 
+    public function getJsSrc()
+    {
+        return $this->isTest() ? Config::getTestJsSrc() : Config::getLiveJsSrc();
+    }
     
 }

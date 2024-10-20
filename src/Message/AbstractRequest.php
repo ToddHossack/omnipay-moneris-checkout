@@ -308,7 +308,7 @@ abstract class AbstractRequest extends \Omnipay\Common\Message\AbstractRequest
             $this->response = new $class($this, $responseData);
         
         } catch (\Exception $ex) {
-            Helper::debug($ex->getMessage()); exit;
+            //Helper::debug($ex->getMessage());
             throw new RuntimeException($ex->getMessage(),$ex->getCode());
         }
 
@@ -359,7 +359,7 @@ abstract class AbstractRequest extends \Omnipay\Common\Message\AbstractRequest
             return $this->httpClient->send($request);
 
         } catch (\Exception $ex) {
-            Helper::debug($ex->getMessage()); exit;
+            //Helper::debug($ex->getMessage()); exit;
             throw new RuntimeException($ex->getMessage(),$ex->getCode());
         }
     }

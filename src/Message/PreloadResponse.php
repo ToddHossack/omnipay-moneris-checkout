@@ -2,29 +2,41 @@
 namespace Omnipay\Moneris\Message;
 
 use Omnipay\Moneris\Helper;
-use Omnipay\Moneris\Config;
-
 use Omnipay\Moneris\Message\AbstractResponse;
-use Omnipay\Common\Message\RedirectResponseInterface;
-use Symfony\Component\HttpFoundation\Response as HttpResponse;
-use Symfony\Component\HttpFoundation\RedirectResponse as HttpRedirectResponse;
-
-use RuntimeException;
 
 /**
  * Moneris Purchase Response
  */
 class PreloadResponse extends AbstractResponse
 {
-
+    
+    
+    public function isSuccessful()
+    {
+        $success = Helper::data_get($this->data,'response.success');
+        $error = $this->getError();
+        return (in_array($success,[1,'1','true',true],true) && empty($error));
+    }
+    
+    public function getError()
+    {
+        return Helper::data_get($this->data,'response.error');
+    }
+    
     public function isPending()
     {
         return true;
     }
-
-    public function getJsSrc()
+    
+    /**
+     * Response code
+     *
+     * @return null|string A response code from the payment gateway
+     */
+    public function getCode()
     {
-        return $this->isTest() ? Config::getTestJsSrc() : Config::getLiveJsSrc();
+        return Helper::data_get($this->data,'response.response_code');
     }
+
     
 }

@@ -7,6 +7,8 @@ namespace Omnipay\Moneris\Message;
 class ReceiptRequest extends AbstractRequest
 {
     
+    protected $responseClass = \Omnipay\Moneris\Message\ReceiptResponse::class;
+    
     /* ------------------------------------------------------------------------ 
      * Parameter config methods
      * ------------------------------------------------------------------------    
@@ -14,37 +16,18 @@ class ReceiptRequest extends AbstractRequest
     
     public function requiredParameterConfig() 
     {
-        $config = parent::requiredParameterConfig();
-        
-        $config['ticket'] = [
-            'type' => 'string',
-            'limit' => 50
-        ];
-        
-        $config['action'] = [
-            'type' => 'string',
-            'value' => 'receipt'
+        return [
+            'ticket' => [
+                'type' => 'string',
+                'limit' => 50,
+                'required' => true
+            ],
+            'action' => [
+                'type' => 'string',
+                'default' => 'receipt',
+                'required' => true
+            ]
         ];
     }
     
-    /*
-     * 
-     
-    public function getData()
-    {
-        $requestMethod = $this->httpRequest->server->get('REQUEST_METHOD');
-        if($requestMethod === 'POST') {
-            return $this->httpRequest->request->all();
-        } else {
-            return $this->httpRequest->query->all();
-        }
-    }
-
-    public function sendData($data)
-    {
-        $this->response = new CompletePurchaseResponse($this, $data);
-        return $this->response;
-    }
-     * 
-     */
 }

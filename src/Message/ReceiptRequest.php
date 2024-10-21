@@ -14,7 +14,7 @@ class ReceiptRequest extends AbstractRequest
      * ------------------------------------------------------------------------    
      */
     
-    public function requiredParameterConfig() 
+    public static function requiredParameterConfig() 
     {
         return [
             'ticket' => [

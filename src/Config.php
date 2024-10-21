@@ -50,7 +50,7 @@ class Config
      * Get test end point 
      * @return string $url
      */
-    public function getTestEndpoint()
+    public static function getTestEndpoint()
     {
         return static::$testEndpoint;
     }
@@ -60,7 +60,7 @@ class Config
      * Get live end point 
      * @return string $url
      */
-    public function getLiveEndpoint()
+    public static function getLiveEndpoint()
     {
         return static::$liveEndpoint;
     }
@@ -69,7 +69,7 @@ class Config
      * Get live JS source
      * @return string
      */
-    public function getLiveJsSrc()
+    public static function getLiveJsSrc()
     {
         return static::$liveJsSrc;
     }
@@ -78,7 +78,7 @@ class Config
      * Get test JS source
      * @return string
      */
-    public function getTestJsSrc()
+    public static function getTestJsSrc()
     {
         return static::$testJsSrc;
     }

@@ -45,17 +45,17 @@ class PreloadRequest extends AbstractRequest
             'order_no' => [
                 'type' => 'string',
                 'limit' => 50,
-                'replace' => [' ','<','>','$'.'%','=','\\','?','^','{','}','[',']','"']
+                'replace' => [' ','<','>','$','%','=','\\','?','^','{','}','[',']','"']
             ],
             'cust_id' => [
                 'type' => 'string',
                 'limit' => 50,
-                'replace' => [' ','<','>','$'.'%','=','\\','?','^','{','}','[',']','"']
+                'replace' => [' ','<','>','$','%','=','\\','?','^','{','}','[',']','"']
             ],
             'dynamic_descriptor' => [
                 'type' => 'string',
                 'limit' => 20,
-                'replace' => [' ','<','>','$'.'%','=','\\','?','^','{','}','[',']','"']
+                'replace' => [' ','<','>','$','%','=','\\','?','^','{','}','[',']','"']
             ],
             'language' => [
                 'type' => 'string',
@@ -170,12 +170,12 @@ class PreloadRequest extends AbstractRequest
                         'description' => [
                             'type' => 'string',
                             'limit' => 200,
-                            'replace' => ['<','>','$'.'%','=','\\','?','^','{','}','[',']','"']
+                            'replace' => ['<','>','$','%','=','\\','?','^','{','}','[',']','"']
                         ],
                         'product_code' => [
                             'type' => 'string',
                             'limit' => 50,
-                            'replace' => ['<','>','$'.'%','=','\\','?','^','{','}','[',']','"']
+                            'replace' => ['<','>','$','%','=','\\','?','^','{','}','[',']','"']
                         ],
                         'unit_cost' => [
                             'type' => 'float',
@@ -223,7 +223,7 @@ class PreloadRequest extends AbstractRequest
                 'description' => [
                     'type' => 'string',
                     'limit' => 50,
-                    'replace' => ['<','>','$'.'%','=','\\','?','^','{','}','[',']','"']
+                    'replace' => ['<','>','$','%','=','\\','?','^','{','}','[',']','"']
                 ],
                 'rate' => [
                     'type' => 'float',
@@ -276,12 +276,12 @@ class PreloadRequest extends AbstractRequest
                 'address_1' => [
                     'type' => 'string',
                     'limit' => 50,
-                    'replace' => ['<','>','$'.'%','=','\\','?','^','{','}','[',']','"']
+                    'replace' => ['<','>','$','%','=','\\','?','^','{','}','[',']','"']
                 ],
                 'address_2' => [
                     'type' => 'string',
                     'limit' => 50,
-                    'replace' => ['<','>','$'.'%','=','\\','?','^','{','}','[',']','"']
+                    'replace' => ['<','>','$','%','=','\\','?','^','{','}','[',']','"']
                 ],
                 'city' => [
                     'type' => 'string',
@@ -298,7 +298,7 @@ class PreloadRequest extends AbstractRequest
                 'postal_code' => [
                     'type' => 'string',
                     'limit' => 20,
-                    'replace' => ['<','>','$'.'%','=','\\','?','^','{','}','[',']','"']
+                    'replace' => ['<','>','$','%','=','\\','?','^','{','}','[',']','"']
                 ]
             ]
         ];

@@ -245,7 +245,7 @@ abstract class AbstractRequest extends \Omnipay\Common\Message\AbstractRequest
         
         // Required parameter dasta
         $data += (array) $this->prepareParameterDataArray(static::requiredParameterConfig(),true);
-        
+  
         // Optional parameter data
         $data += (array) $this->prepareParameterDataArray(array_merge(
             (array) static::optionalParameterConfig(), 

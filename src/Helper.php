@@ -109,23 +109,19 @@ class Helper extends \Omnipay\Common\Helper
         // Initial cast
         $val = static::castTo($val,$type);
 
-        // Check integer range
-        if($type === 'int') {
+        // Check range
+        if(in_array($type,['int','float'])) {
             // Min
-            if(isset($cfg['min']) && $val < intval($cfg['min'])) {
-                throw new RuntimeException(sprintf('Parameter %s must be greater than %d.',$key,intval($cfg['min'])));
-            }
+            static::validateMin($key,$val,$cfg);
             // Max
-            if(isset($cfg['max']) && $val > intval($cfg['max'])) {
-                throw new RuntimeException(sprintf('Parameter %s must be less than %d.',$key,intval($cfg['max'])));
-            }
+            static::validateMax($key,$val,$cfg);
         }
 
         // Not in allowed options
-        if(!static::isEmpty($val) && !empty($cfg['options']) && is_array($cfg['options']) && !in_array($val,$cfg['options'],true)) {
-            throw new RuntimeException(sprintf('Allowed values for parameter %s are %s.',$key,'['.implode('|',$cfg['options']).']'));
+        if(isset($cfg['options'])) {
+            static::validateInOptions($key,$val,$cfg);
         }
-
+        
         // Final cast
         if($sendType !== gettype($val)) {
             $val = static::castTo($val,$sendType,$cfg);
@@ -133,36 +129,141 @@ class Helper extends \Omnipay\Common\Helper
 
         // Format / check string
         if($sendType === 'string') {
+            
             // String length
-            if(isset($cfg['limit']) && strlen($val) > intval($cfg['limit'])) {
-                throw new RuntimeException(sprintf('Parameter %s has a limit of %d characters.',$key,intval($cfg['limit'])));
+            static::validateLimit($key,$val,$cfg);
+            
+            // Invalid characters
+            $val = static::validateCharacters($key,$val,$cfg,true);
+            
+        }
+        
+        return $val;
+    }
+    
+    /**
+     * Checks length of value
+     * @param string $key
+     * @param mixed $val
+     * @param array $cfg
+     * @param bool $replace
+     * @throws RuntimeException
+     */
+    public static function validateCharacters($key,$val,$cfg=[],$replace=false)
+    {
+        // Replace disallowed characters
+        if(!empty($cfg['replace'])) {
+            // Don't replace, just warn
+            if(!$replace) {
+                $found = [];
+                foreach((array) $cfg['replace'] as $char) {
+                    if(strpos($val,$char) !== false && !in_array($char,$found)) {
+                        $found[] = $char;
+                    }
+                }
+                
+                if(count($found)) {
+                    throw new RuntimeException(sprintf('%s has invalid character(s): %s.',$key,implode(' ',$found)));
+                }
             }
-
-            // Replace disallowed characters
-            if(!empty($cfg['replace'])) {
-                $count = null;
-                $replaced = str_replace($cfg['replace'],'',$val,$count);
-                // Check
-                if($count) {
-                    throw new RuntimeException(sprintf('Parameter %s contains disallowed characters (%s).',$key,implode(',',(array)$cfg['replace'])));
-                }
-                else {
-                    $val = $replaced;
-                }
+            // Just replace, without a warning
+            else {
+                $val = str_replace($cfg['replace'],'',$val,$count);
             }
         }
         
         return $val;
     }
     
-    
-    public static function validateRequired($key,$val,$cfg=[])
+    /**
+     * Checks length of value
+     * @param string $key
+     * @param mixed $val
+     * @param array $cfg
+     * @throws RuntimeException
+     */
+    public static function validateLimit($key,$val,$cfg=[])
     {
-        if(!empty($cfg['required']) && static::isEmpty($val)) {
-            throw new RuntimeException(sprintf('A value is required for parameter %s.',$key));
+        // String length
+        if(isset($cfg['limit']) && strlen($val) > intval($cfg['limit'])) {
+            throw new RuntimeException(sprintf('%s has a limit of %d characters.',$key,intval($cfg['limit'])));
         }
     }
     
+    /**
+     * Checks value is not less than configured minimum
+     * @param string $key
+     * @param mixed $val
+     * @param array $cfg
+     * @throws RuntimeException
+     */
+    public static function validateMin($key,$val,$cfg=[])
+    {
+        if(!isset($cfg['min']) || !is_numeric($cfg['min'])) {
+            return;
+        }
+            
+        if(!is_numeric($val) || bccomp(strval(floatval($val)),strval(floatval($cfg['min'])),2) === -1) {
+            throw new RuntimeException(sprintf('%s cannot be less than %s.',$key,$cfg['min']));
+        }
+    }
+    
+    /**
+     * Checks value is not greater than configured maximum
+     * @param string $key
+     * @param mixed $val
+     * @param array $cfg
+     * @throws RuntimeException
+     */
+    public static function validateMax($key,$val,$cfg=[])
+    {
+        if(!isset($cfg['max']) || !is_numeric($cfg['max'])) {
+            return;
+        }
+            
+        if(!is_numeric($val) || bccomp(strval(floatval($val)),strval(floatval($cfg['max'])),2) === 1) {
+            throw new RuntimeException(sprintf('%s cannot be more than %s.',$key,$cfg['max']));
+        }
+    }
+    
+    /**
+     * Checks value is not greater than configured maximum
+     * @param string $key
+     * @param mixed $val
+     * @param array $cfg
+     * @throws RuntimeException
+     */
+    public static function validateInOptions($key,$val,$cfg=[])
+    {
+        if(empty($cfg['options']) || !is_array($cfg['options'])) {
+            return;
+        }
+        
+        // Not in allowed options
+        if(!static::isEmpty($val) && !in_array($val,$cfg['options'],true)) {
+            throw new RuntimeException(sprintf('Invalid option selected for %s.',$key));
+        }
+    }
+    
+    /**
+     * Checks value is not empty if it is required
+     * @param string $key
+     * @param mixed $val
+     * @param array $cfg
+     * @throws RuntimeException
+     */
+    public static function validateRequired($key,$val,$cfg=[])
+    {
+        if(!empty($cfg['required']) && static::isEmpty($val)) {
+            throw new RuntimeException(sprintf('A value is required for %s.',$key));
+        }
+    }
+    
+    /**
+     * Checks if value has input
+     * @param mixed $val
+     * @return bool
+     */
     public static function isEmpty($val)
     {
         return (

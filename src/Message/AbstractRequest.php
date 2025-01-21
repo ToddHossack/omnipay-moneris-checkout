@@ -329,7 +329,10 @@ abstract class AbstractRequest extends \Omnipay\Common\Message\AbstractRequest
     public function sendData($data)
     { 
         try {
-            
+            /*if($_SERVER['REMOTE_ADDR'] === '') {
+                Helper::debug($data);
+            }*/
+        
             $body = ($this->jsonBody) 
                 ? json_encode($data,JSON_HEX_APOS | JSON_HEX_QUOT)
                 : $data;

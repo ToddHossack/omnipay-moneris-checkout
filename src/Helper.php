@@ -10,6 +10,9 @@ class Helper extends \Omnipay\Common\Helper
    
     protected static $defaultPrecision = 2;
     
+    protected static $thousandsSeparator = '';
+    
+    protected static $decimalSeparator = '.';
     
     public static function getDefaultPrecision()
     {
@@ -19,6 +22,26 @@ class Helper extends \Omnipay\Common\Helper
     public static function setDefaultPrecision($digits)
     {
         static::$defaultPrecision = (int) $digits;
+    }
+    
+    public static function getThousandsSeparator()
+    {
+        return static::$thousandsSeparator;
+    }
+    
+    public static function setThousandsSeparator($symbol)
+    {
+        static::$thousandsSeparator = (string) $symbol;
+    }
+    
+    public static function getDecimalSeparator()
+    {
+        return static::$decimalSeparator;
+    }
+    
+    public static function setDecimalSeparator($symbol)
+    {
+        static::$decimalSeparator = (string) $symbol;
     }
     
     /* ------------------------------------------------------------------------ 
@@ -301,13 +324,22 @@ class Helper extends \Omnipay\Common\Helper
             case 'string':
             default:
                 if(is_float($val)) {
-                    $decimals = isset($options['decimals']) ? (int) $options['decimals'] : static::defaultPrecision;
-                    return number_format($val,$decimals);
+                    return static::formatFloat($val,static::data_get($options,'decimals'));
                 }
                 return (string) $val;
                 break;
         };
         
+    }
+    
+    public static function formatFloat($val,$decimals=null,$decimalSeparator=null,$thousandsSeparator=null)
+    {
+        return number_format(
+            $val,
+            isset($decimals) ? (int) $decimals : static::$defaultPrecision,
+            isset($decimalSeparator) ? (int) $decimalSeparator : static::$decimalSeparator,
+            isset($thousandsSeparator) ? (int) $thousandsSeparator : static::$thousandsSeparator
+        );
     }
     
     /**
@@ -352,14 +384,169 @@ class Helper extends \Omnipay\Common\Helper
         return ($value instanceof Closure) ? $value() : $value;
     }
     
+    /**
+     * Modifies an item from an array using "dot" notation.
+     *
+     * @param  array $data
+     * @param  string|int $path  (path with dot notation, or array path)
+     * @param  mixed $default
+     * @return null|bool
+     */
+    public static function data_modify(&$data, $path, $callback) {
+        if (empty($data) || $path === '' || $path === null) {
+            return null;
+        }
+        if(!is_callable($callback)) {
+            return false;
+        }
+        $found =& $data;
+        $keys = is_array($path) ? $path : explode('.', $path);
+        $numKeys = count($keys);
+        $i = 1;
+        foreach ($keys as $k) {
+            // Object
+            if (is_object($found) && property_exists($found,$k)) {
+                if($i === $numKeys) {
+                    $found->{$k} = call_user_func_array($callback,[$found->{$k}]); // Modify
+                } else {
+                    $found =& $found->{$k}; // Store for next iteration
+                }
+            } 
+            // Array
+            elseif (is_array($found) && array_key_exists($k,$found)) {
+                if($i === $numKeys) {
+                   $found[$k] = call_user_func_array($callback,[$found[$k]]); // Modify
+                } else {
+                    $found =& $found[$k]; // Store for next iteration
+                }
+                
+            // Key does not exist - exit early
+            } elseif ($i < $numKeys) {
+                break;
+            }
+            ++$i;
+        }
+    }
+    
+    public static function data_modify_multiple(&$data,$paths,$callback)
+    {
+        $errors = [];
+
+        if(empty($data)) {
+            $errors[] = 'Data array is empty';
+            return $errors;
+        }
+        
+        if(empty($paths) || !is_array($paths)) {
+            $errors[] = 'Paths array is empty';
+            return $errors;
+        }
+
+        // Iterate specified parameters, encrypting each
+        foreach($paths as $path) {
+            try {
+                $result = self::data_modify($data,$path,$callback);
+                if($result === false) {
+                    $errors[] = sprintf('Could not modify data for path (%s).',$path);
+                }
+            } catch (\Exception $ex) {
+                $errors[] = sprintf('Exception encountered for path (%s): ',$path) . $ex->getMessage();
+            }
+        }
+        
+        return $errors;
+    }
+    
+    public static function maskValue($value,$char='*')
+    {
+        $val =& $value;
+        // Object
+        if(is_object($val)) {
+            foreach(get_object_vars($val) as $k => $v) {
+                self::maskValue($val->{$k},$char);
+            }
+        }
+        // Array
+        elseif(is_array($val)) {
+            foreach($val as $k => $v) {
+                $val[$k] = self::maskValue($v,$char);
+            }
+        }
+        // Scalar
+        else {
+            // Hash value, keeping the same length
+            $val = str_pad('',strlen(strval($val)),$char);
+        }
+        
+        return $val;
+    }
+    
+    public static function hashValue($value,$algo='sha256')
+    {
+        $val =& $value;
+        // Object
+        if(is_object($val)) {
+            foreach(get_object_vars($val) as $k => $v) {
+                self::hashValue($val->{$k},$algo);
+            }
+        }
+        // Array
+        elseif(is_array($val)) {
+            foreach($val as $k => $v) {
+                $val[$k] = self::hashValue($v,$algo);
+            }
+        }
+        // Scalar
+        else {
+            // Hash value, keeping the same length
+            $hashed = hash($algo,$val);
+            $val = substr($hashed,0,strlen(strval($val)));
+        }
+        
+        return $val;
+    }
+    
+    public static function obfuscateValueWithTypes($value)
+    {
+        $val =& $value;
+        // Object
+        if(is_object($val)) {
+            foreach(get_object_vars($val) as $k => $v) {
+                self::obfuscateValueWithTypes($val->{$k});
+            }
+        }
+        // Array
+        elseif(is_array($val)) {
+            foreach($val as $k => $v) {
+                $val[$k] = self::obfuscateValueWithTypes($v);
+            }
+        }
+        // Scalar
+        else {
+            // Hash value, keeping the same length
+            $val = preg_replace(
+                ['/[A-Z]/','/[a-z]/','/[\d]/','/[\s]/'],
+                ['A','a','0',' '],
+                $val
+            );
+        }
+        
+        return $val;
+    }
+    
     public static function truncate($str,$limit)
     {
         return substr(trim(strval($str)),0,intval($limit));
     }
     
-    public static function debug($data)
+    public static function debug($data,$doTrace=false)
     {
-        echo '<pre>';
+        echo '<pre><b>';
+        print(__FILE__ .': Line '.__LINE__ ."</b>\n");
+        if($doTrace) {
+            $trace = debug_backtrace();
+            print_r(array_intersect_key(self::data_get($trace,[1],[]),array_flip(['file','line','function','class'])));
+        }
         print_r($data);
         echo '</pre>';
     }

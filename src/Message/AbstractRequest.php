@@ -32,7 +32,8 @@ abstract class AbstractRequest extends \Omnipay\Common\Message\AbstractRequest
      */
     protected static $mockResponseData;
     
-    
+    protected static $excludedParameters = ['returnUrl','cancelUrl','notifyUrl'];
+
     /* ------------------------------------------------------------------------ 
      * Init
      * ------------------------------------------------------------------------    
@@ -79,6 +80,11 @@ abstract class AbstractRequest extends \Omnipay\Common\Message\AbstractRequest
 
         if(is_array($parameters)) {
             foreach($parameters as $key => $value) {
+                
+                if(in_array($key,static::getExcludedParameters())) {
+                    continue;
+                }
+                
                 // Use setter if available
                 $method = 'set'.ucfirst(Helper::camelCase($key));
                 
@@ -121,6 +127,35 @@ abstract class AbstractRequest extends \Omnipay\Common\Message\AbstractRequest
         $this->gatewayParameters = $parameters;
     }
     
+     /**
+     * Get all parameters as an associative array.
+     * Overrides the parent getter because the following reason:
+     * This method is called higher in the hierarchy for the purpose
+     * of storing parameters. So we ensure the parameters are processed/formatted 
+     * first here, so that what is stored matches what is sent by getData method.
+     * Processing for both happens here.
+     * @todo Ideally should revert to preparing parameter data in the initialize method and setters. 
+     * @return array
+     */
+    public function getParameters()
+    {
+
+        $data = [];
+
+        // Gateway parameter data
+        $data += (array) $this->getGatewayData();
+
+        // Required parameter dasta
+        $data += (array) $this->prepareParameterDataArray(static::requiredParameterConfig(),true);
+
+        // Optional parameter data
+        $data += (array) $this->prepareParameterDataArray(array_merge(
+            (array) static::optionalParameterConfig(), 
+            (array) static::optionalParameterObjectConfig()
+        ));
+
+        return $data;
+    }
     /**
      * Gets endpoint
      * @return string
@@ -155,6 +190,25 @@ abstract class AbstractRequest extends \Omnipay\Common\Message\AbstractRequest
     public function setMock($mode)
     {
         $this->mock = (bool) $mode;
+    }
+    
+    /**
+     * Gets mock setting
+     * @return bool
+     */
+    public static function getExcludedParameters()
+    {
+        return static::$excludedParameters;
+    }
+    
+    /**
+     * Sets excluded parameters.
+     * Helpful for removing obsolete parameters.
+     * @param bool $mode
+     */
+    public static function setExcludedParameters($keys)
+    {
+        static::$excludedParameters = (array) $keys;
     }
     
     /**
@@ -238,21 +292,7 @@ abstract class AbstractRequest extends \Omnipay\Common\Message\AbstractRequest
     
     public function getData()
     {
-        $data = [];
-        
-        // Gateway parameter data
-        $data += (array) $this->getGatewayData();
-        
-        // Required parameter dasta
-        $data += (array) $this->prepareParameterDataArray(static::requiredParameterConfig(),true);
-  
-        // Optional parameter data
-        $data += (array) $this->prepareParameterDataArray(array_merge(
-            (array) static::optionalParameterConfig(), 
-            (array) static::optionalParameterObjectConfig()
-        ));
-        
-        return $data;
+        return $this->getParameters();
     }
     
     // Assumed formatted and validated by gateway

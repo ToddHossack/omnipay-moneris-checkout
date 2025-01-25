@@ -37,6 +37,41 @@ class Config
         ]     
     ];
     
+    protected static $fraudToolResultValues = [
+        // CVD / AVS / 3-D Secure
+        '1'   => [
+            'message' => 'Success',
+        ],
+        '2'   => [
+            'error' => true,
+            'message' => 'Failed',
+        ],
+        '3'   => [
+            'error' => true,
+            'message' => 'Not performed',
+        ],
+        '4'   => [
+            'error' => true,
+            'message' => 'Card not eligible',
+        ],
+        // Kount
+        '001'   => [
+            'message' => 'Success',
+        ],
+        '973'   => [
+            'error' => true,
+            'message' => 'Unable to locate merchant Kount details',
+        ],
+        '984'  => [
+            'error' => true,
+            'message' => 'Data error',
+        ],
+        '987'  => [
+            'error' => true,
+            'message' => 'Invalid transaction',
+        ]   
+    ];
+    
     /**
      * Set test end point - allow for local development / mock gateways
      * @param string $url
@@ -92,6 +127,11 @@ class Config
     public static function getCallbackResponseCodes()
     {
         return static::$callbackResponseCodes;
+    }
+    
+    public static function getFraudToolResultValues()
+    {
+        return static::$fraudToolResultValues;
     }
     
 }

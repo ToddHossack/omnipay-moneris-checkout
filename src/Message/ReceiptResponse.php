@@ -3,6 +3,7 @@ namespace Omnipay\Moneris\Message;
 
 use Omnipay\Moneris\Helper;
 use Omnipay\Moneris\Message\AbstractResponse;
+use Omnipay\Moneris\Config;
 
 /**
  * Moneris Complete Purchase Response
@@ -66,19 +67,18 @@ class ReceiptResponse extends AbstractResponse
         
         // No message - try fraud prevention messages
         if(empty($messages) && !$this->isApproved()) {
-            foreach(['cvd','avs','3d_secure','kount'] as $strategy) {
-                $strategyResponse = Helper::data_get($this->data,['response','receipt','cc','fraud',$strategy]);
-                // Skip successful or disabled fraud strategy
-                $status = Helper::data_get($strategyResponse,'status');
-                if(in_array($status,['success','disabled'],true)) {
-                    continue;
-                }
+            
+            $fraudResponses = $this->findFailedOrErrorFraudToolResponses();
+            
+            foreach($fraudResponses as $fraudTool => $fraudResponse) {
                 // Find message
-                $msg = $this->getMessageFromFraudToolData($strategyResponse);
+                $msg = $this->getMessageFromFraudToolData($fraudResponse);
+                
                 if(!empty($msg)) {
                     if(stripos($msg,'declined') === false) {
-                        $msg = 'DECLINED - '. $msg;
+                        $msg = 'DECLINED - '. $msg .' ('. strtoupper($fraudTool) .')';
                     }
+                    
                     $messages = [$msg];
                     break;
                 }
@@ -88,15 +88,52 @@ class ReceiptResponse extends AbstractResponse
         return (is_array($messages)) ? implode(' / ', $messages) : '';
     }
     
+    public function findFailedOrErrorFraudToolResponses()
+    {
+        $strategies = ['cvd','avs','3d_secure','kount'];
+        $filtered = [];
+        
+        foreach($strategies as $strategy) {
+            $strategyResponse = Helper::data_get($this->data,['response','receipt','cc','fraud',$strategy]);
+            // Skip not found
+            if(empty($strategyResponse)) {
+                continue;
+            }
+            // Skip successful or disabled detected by status
+            $status = Helper::data_get($strategyResponse,'status');
+            if(in_array($status,['success','disabled'],true)) {
+                continue;
+            }
+            // Skip successful or disabled detected by result
+            $result = Helper::data_get($strategyResponse,'result');
+            if(in_array(strval($result),['1','001','3'],true)) {
+                continue;
+            }
+            
+            $filtered[$strategy] = $strategyResponse;
+        }
+        
+        return $filtered;
+    }
+    
     protected function getMessageFromFraudToolData($data)
     {
-        // Message in details
+        // Message in details (Kount / 3-D Secure)
         $msg = Helper::data_get((array) $data,'details.message');
         if(!empty(trim($msg))) {
             return ucfirst($msg);
         }
-        // Use status
-        $status = Helper::data_get((array) $data,'status');
+        
+        // Message by result value
+        $result = Helper::data_get($data,'result');
+        $resultMessage = Helper::data_get(Config::getFraudToolResultValues(),[strval($result),'message']);
+        
+        if($resultMessage) {
+            return $resultMessage;
+        }
+        
+        // Message from status (fallback)
+        $status = strtolower(Helper::data_get((array) $data,'status',''));
         if($status && $status !== 'success' && $status !== 'disabled') {
             $msg = ucfirst(str_replace('_',' ',$status)); // Format as user friendly text
         }
@@ -159,7 +196,6 @@ class ReceiptResponse extends AbstractResponse
          */
         elseif($code > 50) {
             return ['DECLINED','REFUSÉE'];
-            
         }
         
         return null;

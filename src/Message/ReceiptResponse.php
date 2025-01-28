@@ -76,7 +76,18 @@ class ReceiptResponse extends AbstractResponse
                 
                 if(!empty($msg)) {
                     if(stripos($msg,'declined') === false) {
-                        $msg = 'DECLINED - '. $msg .' ('. strtoupper($fraudTool) .')';
+                        $msg = 'DECLINED - '. $msg;   // Preface with declined
+                    }
+                    // Add fraud tool identifier
+                    $msg .= ' ('. strtoupper($fraudTool) .'). ';
+                    
+                    switch($fraudTool) {
+                        case 'avs':
+                            $msg .= 'Please ensure billing address matches credit card address.';
+                            break;
+                        case 'cvd': 
+                            $msg .= 'Please ensure CVV is correct.';
+                            break;
                     }
                     
                     $messages = [$msg];

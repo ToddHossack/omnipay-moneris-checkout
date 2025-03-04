@@ -78,6 +78,9 @@ class ReceiptResponse extends AbstractResponse
                     if(stripos($msg,'declined') === false) {
                         $msg = 'DECLINED - '. $msg;   // Preface with declined
                     }
+                    // Remove "success", if present
+                    $msg = str_replace(['success','Success'],'',$msg);
+                    
                     // Add fraud tool identifier
                     $msg .= ' ('. strtoupper($fraudTool) .'). ';
                     
